@@ -1,12 +1,12 @@
-# Local ledger (contains personal transactions)
-data/transactions.csv
-
-# Local overrides (may contain personal account names)
+# Personal configuration (contains account names, preferences)
 references/config.local.json
 
-# User-specific categories (may contain personal taxonomy/phrases)
+# User-specific category tree and aliases
 references/categories.json
 references/category_aliases.json
+
+# Legacy data directory (no longer used)
+data/
 
 # Python
 __pycache__/

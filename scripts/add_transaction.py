@@ -1,58 +1,127 @@
 #!/usr/bin/env python3
+"""
+MoneyWiz URL generator for OpenClaw.
+
+Generates moneywiz:// deep links for expense/income/transfer transactions.
+No local ledger storage - just URL generation.
+"""
 import argparse
-import csv
 import json
 import os
 import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from urllib.parse import quote
-from typing import Optional
+from typing import Optional, Dict, List
 
-from categories import flatten_categories, load_json, resolve_category
-
+# Paths relative to this script's parent directory (the skill root)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, "references", "config.json")
 CONFIG_LOCAL_PATH = os.path.join(BASE_DIR, "references", "config.local.json")
-DATA_DIR = os.path.join(BASE_DIR, "data")
-LEDGER_PATH = os.path.join(DATA_DIR, "transactions.csv")
-
-# Optional category validation
-CATEGORIES_DEFAULT = os.path.join(BASE_DIR, "references", "categories.json")
-ALIASES_DEFAULT = os.path.join(BASE_DIR, "references", "category_aliases.json")
+CATEGORIES_PATH = os.path.join(BASE_DIR, "references", "categories.json")
+ALIASES_PATH = os.path.join(BASE_DIR, "references", "category_aliases.json")
 
 
-def load_config():
+def load_config() -> Dict:
     """Load config with local override.
 
-    - references/config.json: safe defaults (can be committed to public repo)
-    - references/config.local.json: user-specific overrides (ignored by git)
+    Priority:
+    1. references/config.local.json (user-specific, gitignored)
+    2. references/config.json (defaults)
     """
     cfg = {}
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        cfg = json.load(f)
-
+    
+    # Load base config
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    
+    # Merge local overrides (takes precedence)
     if os.path.exists(CONFIG_LOCAL_PATH):
         try:
             with open(CONFIG_LOCAL_PATH, "r", encoding="utf-8") as f:
                 local = json.load(f)
-            # shallow merge
-            cfg.update(local)
-        except Exception:
-            pass
-
+            cfg.update(local)  # local overrides base
+        except Exception as e:
+            print(f"Warning: Failed to load config.local.json: {e}", file=sys.stderr)
+    
     return cfg
 
 
-def ensure_dirs():
-    os.makedirs(DATA_DIR, exist_ok=True)
+def load_json(path: str) -> Dict:
+    """Load a JSON file."""
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _walk_category(node: Dict, prefix: Optional[str] = None) -> List[str]:
+    """Recursively walk category tree and collect all paths."""
+    name = node.get("name", "").strip()
+    if not name:
+        return []
+    path = name if not prefix else f"{prefix}/{name}"
+    children = node.get("children") or []
+    if not children:
+        return [path]
+    out: List[str] = []
+    for ch in children:
+        out.extend(_walk_category(ch, path))
+    return out
+
+
+def flatten_categories(tree: Dict) -> List[str]:
+    """Flatten category tree into list of 'Parent/Child' paths."""
+    cats = tree.get("categories") or []
+    out: List[str] = []
+    for c in cats:
+        out.extend(_walk_category(c, None))
+    # Also allow top-level categories as leaf
+    top = [c.get("name", "").strip() for c in cats if c.get("name")]
+    out.extend([t for t in top if t])
+    # Unique, preserving order
+    seen = set()
+    return [p for p in out if not (p in seen or seen.add(p))]
+
+
+def resolve_category(
+    raw: Optional[str],
+    categories: List[str],
+    aliases: Dict[str, str],
+) -> Optional[str]:
+    """Resolve user input to a valid category path."""
+    if raw is None:
+        return None
+    s = raw.strip()
+    if not s:
+        return None
+
+    # Exact match
+    if s in categories:
+        return s
+
+    # Try alias (case-insensitive)
+    key = s.lower()
+    if key in aliases:
+        return aliases[key]
+
+    # Heuristic: if user provided a single word, try suffix match
+    if "/" not in s:
+        low = s.lower()
+        hits = [c for c in categories if c.lower().endswith("/" + low) or c.lower() == low]
+        if len(hits) == 1:
+            return hits[0]
+
+    # Return as-is (MoneyWiz will handle unknown categories)
+    return s
 
 
 def now_local(tzname: str) -> datetime:
+    """Get current time in specified timezone."""
     return datetime.now(ZoneInfo(tzname))
 
 
 def normalize_account(name: str) -> str:
+    """Remove spaces from account name (MoneyWiz requirement)."""
     return (name or "").replace(" ", "")
 
 
@@ -70,7 +139,7 @@ def build_moneywiz_url(
     date_str: Optional[str],
     save: bool,
 ) -> str:
-    # MoneyWiz expects URL-encoded values; we keep slashes in category.
+    """Build MoneyWiz URL scheme."""
     params = []
 
     def add(k, v, safe=""):
@@ -87,8 +156,7 @@ def build_moneywiz_url(
         add("account", account)
         add("currency", currency)
         add("payee", payee)
-        # allow slash in category hierarchy
-        add("category", category, safe="/")
+        add("category", category, safe="/")  # Allow slash in category
         add("description", description)
         add("memo", memo)
         add("tags", tags)
@@ -105,43 +173,21 @@ def build_moneywiz_url(
         add("amount", f"{amount:.2f}")
         add("save", str(save).lower())
     else:
-        raise ValueError("unsupported op")
+        raise ValueError(f"unsupported operation: {op}")
 
     qs = "&".join(params)
     return f"moneywiz://{op}?{qs}"
 
 
-def append_ledger(row: dict):
-    ensure_dirs()
-    exists = os.path.exists(LEDGER_PATH)
-    with open(LEDGER_PATH, "a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(
-            f,
-            fieldnames=[
-                "ts_local",
-                "type",
-                "amount",
-                "currency",
-                "account",
-                "to_account",
-                "category",
-                "payee",
-                "description",
-                "memo",
-                "tags",
-                "save",
-                "source",
-            ],
-        )
-        if not exists:
-            w.writeheader()
-        w.writerow(row)
-
-
 def main():
     cfg = load_config()
+    
+    # Debug: print which config was loaded
+    debug = os.environ.get("DEBUG", "").lower() in ("1", "true")
+    if debug:
+        print(f"DEBUG: Loaded config: {json.dumps(cfg, indent=2)}", file=sys.stderr)
 
-    p = argparse.ArgumentParser()
+    p = argparse.ArgumentParser(description="Generate MoneyWiz URL for transaction")
     p.add_argument("--type", choices=["expense", "income", "transfer"], default="expense")
     p.add_argument("--amount", type=float, required=False)
     p.add_argument("--currency", default=None)
@@ -154,51 +200,59 @@ def main():
     p.add_argument("--tags", default=None)
     p.add_argument("--date", default=None, help="YYYY-MM-DD HH:MM:SS (local timezone)")
     p.add_argument("--save", default=None, choices=["true", "false"])
-    p.add_argument("--source", default="openclaw")
     args = p.parse_args()
 
     tz = cfg.get("timezone", "Asia/Singapore")
 
+    # Apply defaults from config
     currency = (args.currency or cfg.get("default_currency") or "").upper()
     account = normalize_account(args.account or cfg.get("default_account") or "")
     to_account = normalize_account(args.to_account) if args.to_account else ""
-    # Category resolution: enforce existing category paths when possible
-    categories_path = cfg.get("categories_file") or CATEGORIES_DEFAULT
-    aliases_path = cfg.get("category_aliases_file") or ALIASES_DEFAULT
+    
+    if debug:
+        print(f"DEBUG: Using account: {account}", file=sys.stderr)
 
+    # Load categories and aliases
     categories_list = []
     aliases = {}
-    try:
-        if os.path.exists(categories_path):
-            categories_list = flatten_categories(load_json(categories_path))
-    except Exception:
-        categories_list = []
-    try:
-        if os.path.exists(aliases_path):
-            aliases = (load_json(aliases_path).get("aliases") or {})
-    except Exception:
-        aliases = {}
+    
+    if os.path.exists(CATEGORIES_PATH):
+        try:
+            categories_list = flatten_categories(load_json(CATEGORIES_PATH))
+            if debug:
+                print(f"DEBUG: Loaded {len(categories_list)} categories", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Failed to load categories: {e}", file=sys.stderr)
+    
+    if os.path.exists(ALIASES_PATH):
+        try:
+            aliases = load_json(ALIASES_PATH).get("aliases") or {}
+            if debug:
+                print(f"DEBUG: Loaded {len(aliases)} aliases", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Failed to load aliases: {e}", file=sys.stderr)
 
+    # Resolve category
     raw_cat = args.category or cfg.get("default_category") or ""
     category = resolve_category(raw_cat, categories_list, aliases) or ""
 
-    # If we have a category list, require membership
+    # Validate category exists (warning only)
     if categories_list and category and category not in categories_list:
-        raise ValueError(
-            f"category not in allowed list: {category}. Provide an existing category path (e.g. 'Food & Life/Buy Food')."
-        )
+        print(f"Warning: category '{category}' not in known categories", file=sys.stderr)
 
+    # Save behavior
     if args.save is None:
         save = bool(cfg.get("moneywiz_save_default", False))
     else:
         save = args.save == "true"
 
+    # Date/time
     if args.date:
-        # assume provided date is local time
         ts_local = args.date.strip()
     else:
         ts_local = now_local(tz).strftime("%Y-%m-%d %H:%M:%S")
 
+    # Build URL
     url = build_moneywiz_url(
         op=args.type,
         amount=args.amount,
@@ -212,24 +266,6 @@ def main():
         tags=args.tags,
         date_str=ts_local,
         save=save,
-    )
-
-    append_ledger(
-        {
-            "ts_local": ts_local,
-            "type": args.type,
-            "amount": f"{args.amount:.2f}" if args.amount is not None else "",
-            "currency": currency,
-            "account": account,
-            "to_account": to_account,
-            "category": category,
-            "payee": args.payee or "",
-            "description": args.description or "",
-            "memo": args.memo or "",
-            "tags": args.tags or "",
-            "save": str(save).lower(),
-            "source": args.source,
-        }
     )
 
     print(url)
