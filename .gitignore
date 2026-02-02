@@ -4,6 +4,10 @@ data/transactions.csv
 # Local overrides (may contain personal account names)
 references/config.local.json
 
+# User-specific categories (may contain personal taxonomy/phrases)
+references/categories.json
+references/category_aliases.json
+
 # Python
 __pycache__/
 *.pyc

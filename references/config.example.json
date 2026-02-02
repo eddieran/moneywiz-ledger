@@ -1,0 +1,10 @@
+{
+  "timezone": "Asia/Singapore",
+  "default_currency": "SGD",
+  "default_account": "Cash",
+  "default_category": "Other",
+  "moneywiz_save_default": true,
+  "auto_open_on_mac": false,
+  "categories_file": "references/categories.json",
+  "category_aliases_file": "references/category_aliases.json"
+}
