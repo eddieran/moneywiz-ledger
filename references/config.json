@@ -1,0 +1,10 @@
+{
+  "timezone": "Asia/Singapore",
+  "default_currency": "SGD",
+  "default_account": "Cash",
+  "default_category": "Other",
+  "moneywiz_save_default": true,
+  "auto_open_on_mac": true,
+  "categories_file": "skills/moneywiz-ledger/references/categories.json",
+  "category_aliases_file": "skills/moneywiz-ledger/references/category_aliases.json"
+}

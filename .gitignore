@@ -1,0 +1,13 @@
+# Local ledger (contains personal transactions)
+data/transactions.csv
+
+# Local overrides (may contain personal account names)
+references/config.local.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
