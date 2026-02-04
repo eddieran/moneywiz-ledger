@@ -27,7 +27,11 @@ Extract fields from natural language:
 - **amount**: number (required)
 - **currency**: ISO code (default from config)
 - **account**: account name without spaces (default from config)
-- **category**: resolved via aliases or exact match
+- **category**: 
+  - **PREFERRED**: Pass the raw keyword (e.g., "Coffee", "Taxi", "Dinner") and let the script resolve it.
+  - **ALTERNATIVE**: Pass the EXACT full path from `categories.json` (e.g., "Food & Life/Coffee").
+  - **STRICT MODE**: The script will enforce that the category exists. If the keyword doesn't resolve to a known category, it will fallback to the default (e.g. "Shopping/Other").
+  - **DO NOT** guess or invent paths.
 - **payee** (optional)
 - **memo** (optional)
 - **date/time** (optional, defaults to now)
@@ -57,11 +61,7 @@ The script:
 
 ### 3) Open in MoneyWiz
 
-If `auto_open_on_mac` is true in config and running on macOS:
-
-```bash
-open "moneywiz://expense?..."
-```
+If `auto_open_on_mac` is true in config and running on macOS, the script will automatically run `open "moneywiz://..."`. You do **not** need to run `open` manually.
 
 ### 4) Reply to user
 

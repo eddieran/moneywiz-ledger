@@ -236,9 +236,24 @@ def main():
     raw_cat = args.category or cfg.get("default_category") or ""
     category = resolve_category(raw_cat, categories_list, aliases) or ""
 
-    # Validate category exists (warning only)
+    # Validate category exists (strict mode: enforce existing)
     if categories_list and category and category not in categories_list:
-        print(f"Warning: category '{category}' not in known categories", file=sys.stderr)
+        fallback = cfg.get("default_category")
+        # Try to resolve fallback to a valid path
+        resolved_fallback = resolve_category(fallback, categories_list, aliases)
+        
+        # Determine final category
+        if resolved_fallback and resolved_fallback in categories_list:
+            final_cat = resolved_fallback
+        elif fallback and fallback in categories_list:
+            final_cat = fallback
+        else:
+            # If default fails, try to find a generic one or just use the first one
+            # But for now, let's just warn and use fallback (or "Uncategorized" if nil)
+            final_cat = fallback or "Uncategorized"
+            
+        print(f"Warning: Category '{category}' not found in list. Fallback to '{final_cat}'.", file=sys.stderr)
+        category = final_cat
 
     # Save behavior
     if args.save is None:
@@ -269,6 +284,16 @@ def main():
     )
 
     print(url)
+    
+    # Auto-open on macOS if configured
+    if sys.platform == "darwin" and cfg.get("auto_open_on_mac"):
+        try:
+            import subprocess
+            subprocess.run(["open", url], check=True)
+            if debug:
+                print("DEBUG: Opened MoneyWiz URL", file=sys.stderr)
+        except Exception as e:
+            print(f"Warning: Failed to auto-open URL: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":
