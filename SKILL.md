@@ -27,11 +27,11 @@ Extract fields from natural language:
 - **amount**: number (required)
 - **currency**: ISO code (default from config)
 - **account**: account name without spaces (default from config)
-- **category**: 
+- **category**:
   - **PREFERRED**: Pass the raw keyword (e.g., "Coffee", "Taxi", "Dinner") and let the script resolve it.
   - **ALTERNATIVE**: Pass the EXACT full path from `categories.json` (e.g., "Food & Life/Coffee").
-  - **STRICT MODE**: The script will enforce that the category exists. If the keyword doesn't resolve to a known category, it will fallback to the default (e.g. "Shopping/Other").
-  - **DO NOT** guess or invent paths.
+  - **INFERENCE-FIRST**: If alias is unknown, the script will infer the most suitable existing category (keyword rules + suffix match), auto-save the learned alias, then bookkeep.
+  - **LAST RESORT**: only when inference fails, fallback to default (e.g. `Shopping/Other`).
 - **payee** (optional)
 - **memo** (optional)
 - **date/time** (optional, defaults to now)
@@ -39,8 +39,10 @@ Extract fields from natural language:
 
 **Category resolution:**
 1. Check exact match in `categories.json`
-2. Check `category_aliases.json` for common phrases (e.g., "吃饭" → "Food & Life/Restaurant")
-3. If still unknown, pass through as-is
+2. Check `category_aliases.json` for known phrases
+3. Infer best-fit category from built-in keyword rules (CN/EN)
+4. Auto-save newly learned alias into `category_aliases.json`
+5. If still unknown, fallback to default category (typically `Shopping/Other`)
 
 If amount is missing, ask for it.
 
@@ -68,6 +70,8 @@ If `auto_open_on_mac` is true in config and running on macOS, the script will au
 Short confirmation: what was logged, which category, amount.
 
 ## MoneyWiz URL Reference
+
+> Note: MoneyWiz URL schemes support creating expenses/income/transfers, but do **not** provide a documented delete/undo action. If a duplicate is created, delete it manually in the app.
 
 Prefix: `moneywiz://`
 
