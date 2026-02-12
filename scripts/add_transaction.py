@@ -83,14 +83,13 @@ def flatten_categories(tree: Dict) -> List[str]:
     return [p for p in out if not (p in seen or seen.add(p))]
 
 
-def infer_category(raw: str, categories: List[str]) -> Optional[str]:
+def infer_category(raw: str, categories: List[str], txn_type: str = "expense") -> Optional[str]:
     """Infer a best-fit category from keywords before falling back to default."""
     s = raw.strip().lower()
     if not s:
         return None
 
-    # Rule-based keyword mapping (CN + EN). First match wins.
-    rules = [
+    expense_rules = [
         (["咖啡", "coffee", "latte", "cappuccino"], "Food & Life/Coffee"),
         (["奶茶", "饮料", "drink", "juice", "茶"], "Food & Life/Drink"),
         (["买菜", "超市", "grocery", "fairprice", "sheng siong"], "Food & Life/Buy Food"),
@@ -123,6 +122,27 @@ def infer_category(raw: str, categories: List[str]) -> Optional[str]:
         (["礼物", "gift"], "Festival/Gift"),
     ]
 
+    income_rules = [
+        (["工资", "salary", "payroll"], "Salary"),
+        (["年终", "年终奖", "annual bonus"], "Annual Bonus"),
+        (["奖金", "bonus"], "Other Bonus"),
+        (["分红", "股息", "dividend"], "Dividends"),
+        (["利息", "interest"], "Interest"),
+        (["投资", "investment"], "Investments"),
+        (["定投", "stable investment", "dca"], "Stable Investment"),
+        (["报税", "退税", "tax refund"], "Tax Refund"),
+        (["返现", "cashback"], "Cashback"),
+        (["退款", "refund"], "Refund"),
+        (["公司福利", "benefit"], "Company Benefit"),
+        (["奖励", "reward"], "Reward"),
+        (["拼单", "aa", "split bill"], "Split bill"),
+        (["闲置", "二手", "carousell"], "Carousell"),
+        (["入金", "存入", "deposit", "debit/deposit"], "Debit/Deposit"),
+        (["收入", "incoming", "other income"], "Other incoming"),
+    ]
+
+    rules = income_rules if txn_type == "income" else expense_rules
+
     for keys, target in rules:
         if target not in categories:
             continue
@@ -136,6 +156,7 @@ def resolve_category(
     raw: Optional[str],
     categories: List[str],
     aliases: Dict[str, str],
+    txn_type: str = "expense",
 ) -> Optional[str]:
     """Resolve user input to a valid category path."""
     if raw is None:
@@ -161,7 +182,7 @@ def resolve_category(
             return hits[0]
 
     # Best-effort inference before fallback
-    inferred = infer_category(s, categories)
+    inferred = infer_category(s, categories, txn_type=txn_type)
     if inferred:
         return inferred
 
@@ -310,9 +331,16 @@ def main():
         except Exception as e:
             print(f"Warning: Failed to load aliases: {e}", file=sys.stderr)
 
-    # Resolve category
-    raw_cat = args.category or cfg.get("default_category") or ""
-    category = resolve_category(raw_cat, categories_list, aliases) or ""
+    # Resolve category (support type-specific defaults)
+    if args.type == "income":
+        default_cat = cfg.get("default_income_category") or cfg.get("default_category")
+    elif args.type == "expense":
+        default_cat = cfg.get("default_expense_category") or cfg.get("default_category")
+    else:
+        default_cat = cfg.get("default_category")
+
+    raw_cat = args.category or default_cat or ""
+    category = resolve_category(raw_cat, categories_list, aliases, txn_type=args.type) or ""
 
     # If inferred/resolved to a valid known path, persist alias for future runs
     raw_key = (raw_cat or "").strip().lower()
@@ -332,18 +360,28 @@ def main():
 
     # Validate category exists (strict mode: enforce existing)
     if categories_list and category and category not in categories_list:
-        fallback = cfg.get("default_category")
+        if args.type == "income":
+            fallback = cfg.get("default_income_category") or cfg.get("default_category")
+            hard_default = "Other incoming"
+        elif args.type == "expense":
+            fallback = cfg.get("default_expense_category") or cfg.get("default_category")
+            hard_default = "Shopping/Other"
+        else:
+            fallback = cfg.get("default_category")
+            hard_default = "Shopping/Other"
+
         # Try to resolve fallback to a valid path
-        resolved_fallback = resolve_category(fallback, categories_list, aliases)
+        resolved_fallback = resolve_category(fallback, categories_list, aliases, txn_type=args.type)
 
         # Determine final category
         if resolved_fallback and resolved_fallback in categories_list:
             final_cat = resolved_fallback
         elif fallback and fallback in categories_list:
             final_cat = fallback
+        elif hard_default in categories_list:
+            final_cat = hard_default
         else:
-            # Last resort
-            final_cat = fallback or "Shopping/Other"
+            final_cat = fallback or hard_default
 
         print(f"Warning: Category '{category}' not found in list. Fallback to '{final_cat}'.", file=sys.stderr)
         category = final_cat

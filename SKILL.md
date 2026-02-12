@@ -24,6 +24,7 @@ Files in `.gitignore` (won't be committed):
 
 Extract fields from natural language:
 - **type**: `expense` (default) | `income` | `transfer`
+  - `income` now supports dedicated income categories (e.g., Salary, Carousell, Interest, Refund, Cashback, etc.)
 - **amount**: number (required)
 - **currency**: ISO code (default from config)
 - **account**: account name without spaces (default from config)
@@ -42,7 +43,9 @@ Extract fields from natural language:
 2. Check `category_aliases.json` for known phrases
 3. Infer best-fit category from built-in keyword rules (CN/EN)
 4. Auto-save newly learned alias into `category_aliases.json`
-5. If still unknown, fallback to default category (typically `Shopping/Other`)
+5. If still unknown, fallback by transaction type:
+   - expense -> `default_expense_category` (typically `Shopping/Other`)
+   - income -> `default_income_category` (typically `Other incoming`)
 
 If amount is missing, ask for it.
 
