@@ -8,6 +8,12 @@ OpenClaw skill for fast personal bookkeeping with **MoneyWiz**.
 
 It converts natural-language transaction input (text/voice transcript) into a `moneywiz://...` deep link, so the transaction can be created in MoneyWiz.
 
+## Search keywords
+
+MoneyWiz, wiz.money, MoneyWiz URL Scheme, OpenClaw skill, personal finance automation, bookkeeping, expense tracking, income tracking, Carousell income, iOS finance app, macOS finance app
+
+中文关键词：记账, 收入分类, 支出分类, MoneyWiz 自动记账, URL Scheme, 闲置收入, 语音记账
+
 ---
 
 ## What this skill does
