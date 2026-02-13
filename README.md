@@ -1,36 +1,77 @@
 # moneywiz-ledger
 
-An OpenClaw skill to:
-- append a local ledger row (CSV) for each transaction
-- generate a `moneywiz://...` URL (MoneyWiz URL Scheme) to create/save the transaction in the MoneyWiz app
+OpenClaw skill for fast personal bookkeeping with **MoneyWiz**.
 
-This repo is designed to be **public** and **privacy-safe**.
+✅ This project is built for and explicitly supports the **MoneyWiz product by Wiz**:
+- Product site: https://www.wiz.money/
+- URL Scheme docs: https://help.wiz.money/en/articles/4525440-automate-transaction-management-with-url-schemas
 
-## Privacy model (important)
-This repo **must not** contain any personal finance data.
+It converts natural-language transaction input (text/voice transcript) into a `moneywiz://...` deep link, so the transaction can be created in MoneyWiz.
+
+---
+
+## What this skill does
+
+- Parse transaction intent from chat-like input
+- Support transaction types: `expense` / `income` / `transfer`
+- Resolve categories via:
+  - exact match
+  - alias mapping
+  - keyword inference
+  - type-specific fallback
+- Generate MoneyWiz URL Scheme links:
+  - `moneywiz://expense?...`
+  - `moneywiz://income?...`
+  - `moneywiz://transfer?...`
+- Optionally auto-open the deep link on macOS
+
+## Income category support (important)
+
+The skill supports dedicated income categories (not just expense categories), including examples like:
+
+- `Other incoming`
+- `Salary`
+- `Investments`
+- `Split bill`
+- `Dividends`
+- `Carousell`
+- `Stable Investment`
+- `Tax Refund`
+- `Interest`
+- `Refund`
+- `Annual Bonus`
+- `Other Bonus`
+- `Reward`
+- `Company Benefit`
+- `Debit/Deposit`
+- `Cashback`
+
+Defaults are type-aware:
+- expense → `Shopping/Other`
+- income → `Other incoming`
+
+## Privacy model
+
+This repo is intended to stay public-safe. Personal finance data should remain local.
 
 Ignored by git:
-- `data/transactions.csv` (your actual transactions)
-- `references/config.local.json` (your personal defaults: account names, etc.)
-- `references/categories.json` and `references/category_aliases.json` (your personal taxonomy / aliases)
+- `references/config.local.json` (private defaults: account names, etc.)
+- `references/categories.json` and `references/category_aliases.json` (personal taxonomy/aliases)
 
-Included in git:
-- `references/config.json` (safe defaults)
-- `references/*.example.json` templates you can copy
+Safe to keep in git:
+- `references/config.json`
+- `references/*.example.json`
+- scripts and skill docs
 
 ## Setup
-### 1) Install / use inside OpenClaw workspace
-This skill can live as a standalone repo (recommended) and be included in your OpenClaw workspace as a submodule.
 
-### 2) Create local config (private)
-Copy the example and edit it:
+1) Create private local config:
 
 ```bash
 cp references/config.example.json references/config.local.json
 ```
 
-### 3) Create your own categories (private)
-Copy examples and edit them:
+2) (Optional) Create private category files:
 
 ```bash
 cp references/categories.example.json references/categories.json
@@ -38,25 +79,24 @@ cp references/category_aliases.example.json references/category_aliases.json
 ```
 
 ## Usage
-Generate a transaction + auto-save in MoneyWiz:
+
+Example: create an income transaction for MoneyWiz
 
 ```bash
 python3 scripts/add_transaction.py \
-  --type expense \
-  --amount 12.30 \
+  --type income \
+  --amount 25 \
   --currency SGD \
-  --account Cash \
-  --category "Food & Life/Restaurant" \
-  --payee "Example Restaurant" \
-  --memo "Dinner" \
-  --date "2026-02-01 19:00:00" \
-  --save true
+  --category "卖闲置" \
+  --payee "Carousell" \
+  --memo "Sold IKEA Alex drawer" \
+  --date "2026-02-12 10:02:00"
 ```
 
-The script:
-- appends to `data/transactions.csv`
+Output:
 - prints a `moneywiz://...` URL
+- optionally opens MoneyWiz directly on macOS (if enabled in config)
 
-## Notes
-- Research/utility tool only.
-- Do not commit your `*.local.json` or ledger CSV.
+---
+
+If you use MoneyWiz and want chat-first bookkeeping, this skill is designed exactly for that workflow.
