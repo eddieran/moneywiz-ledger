@@ -1,0 +1,20 @@
+# Personal configuration (contains account names, preferences)
+references/config.local.json
+
+# User-specific category tree and aliases
+references/categories.json
+references/category_aliases.json
+
+# Legacy data directory (no longer used)
+data/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Autoresearch working directory
+autoresearch-*/
+
+# OS
+.DS_Store

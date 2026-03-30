@@ -1,0 +1,8 @@
+{
+  "notes": "Example aliases. Create your own private aliases in category_aliases.json (ignored by git).",
+  "aliases": {
+    "coffee": "Food & Life/Coffee",
+    "restaurant": "Food & Life/Restaurant",
+    "taxi": "Transportation/Taxi"
+  }
+}

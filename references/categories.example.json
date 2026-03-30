@@ -1,0 +1,14 @@
+{
+  "categories": [
+    { "name": "Food & Life", "children": [
+      { "name": "Coffee", "children": [] },
+      { "name": "Restaurant", "children": [] },
+      { "name": "Buy Food", "children": [] }
+    ] },
+    { "name": "Transportation", "children": [
+      { "name": "Taxi", "children": [] },
+      { "name": "Parking", "children": [] }
+    ] },
+    { "name": "Other", "children": [] }
+  ]
+}
